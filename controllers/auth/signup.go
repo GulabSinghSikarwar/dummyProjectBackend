@@ -1,63 +1,45 @@
 package authController
 
 import (
-	"context"
-	"fmt"
-	"log"
-	"time"
-
-	"github.com/dummyProjectBackend/database"
 	"github.com/dummyProjectBackend/models"
-
-	"gopkg.in/go-playground/validator.v9"
-
 	"github.com/gofiber/fiber/v2"
-	"go.mongodb.org/mongo-driver/bson"
+	"golang.org/x/crypto/bcrypt"
 )
 
-// api/user/login
+func SignupController(c *fiber.Ctx) error {
 
-func SignUp(c *fiber.Ctx) error {
+	var payload *models.SignUpInput
 
-	// reqBody := c.Body()
-	// fmt.Println(reqBody)
-	// var body1 model.User
+	if err := c.BodyParser(&payload); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "fail", "message": err.Error()})
 
-	// json.Unmarshal(reqBody, &body1)
-	// fmt.Println(body1)
-	user := new(models.User)
-	if err := c.BodyParser(user); err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("  recieved user ", user)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
-	defer cancel()
-	// validator
-
-	validate := validator.New()
-	validationErr := validate.Struct(user)
-	if validationErr != nil {
-		// Handle validation errors
-		// This block will be executed if there are validation errors
 	}
 
-	count, err := database.OpenCollection(database.Client, "user").CountDocuments(ctx, bson.M{"email": user.Email})
+	errors := models.ValidateStruct(payload)
+
+	if errors != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status": "fail",
+			"errors": errors,
+		})
+	}
+
+	if payload.Password != payload.ConfirmPasswod {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  "fail",
+			"message": "passwod and confirm password are not same ",
+		})
+
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(payload.Password), bcrypt.DefaultCost)
 
 	if err != nil {
-		return err
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status":  "failed",
+			"message": err.Error(),
+		})
 
 	}
 
-	count, err = database.OpenCollection(database.Client, "user").CountDocuments(ctx, bson.M{"phone": user.Phone})
-
-	if err != nil {
-		return err
-
-	}
-	if count > 0 {
-
-	}
-
-	return c.SendString("Signup route")
 }
