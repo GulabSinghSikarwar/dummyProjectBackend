@@ -5,8 +5,11 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
+// RegisterAuthRoute registers the authentication routes under the given authGroup
 func RegisterAuthRoute(authGroup fiber.Router) {
+	// POST /login route for user login
+	authGroup.Post("/login", authController.SignInController)
 
-	authGroup.Post("/login", authController.Login)
-	authGroup.Post("/signup", authController.SignUp)
+	// POST /signup route for user signup
+	authGroup.Post("/signup", authController.SignupController)
 }

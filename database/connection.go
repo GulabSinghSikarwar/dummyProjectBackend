@@ -18,11 +18,13 @@ const connectionString = "mongodb://127.0.0.1:27017/" + dbName
 var collection *mongo.Collection
 
 // connect with  mongoDB
-func DbInstance() *mongo.Client {
+func DbInstance() (*mongo.Client, error) {
 
 	client, err := mongo.NewClient(options.Client().ApplyURI(connectionString))
 	if err != nil {
-		log.Fatal(err)
+		// log.Fatal(err)
+		return nil, err
+
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -36,13 +38,29 @@ func DbInstance() *mongo.Client {
 		log.Fatal(err)
 	}
 	fmt.Println("Connected to DB ")
-	return client
+	return client, nil
 }
 
-var Client *mongo.Client = DbInstance()
+var Client *mongo.Client
 
-func OpenCollection(client *mongo.Client, collection_Name string) *mongo.Collection {
-	collection := client.Database(dbName).Collection(collection_Name)
+func init() {
+	// Initialize the MongoDB client when the package is imported.
+	var err error
+	Client, err = DbInstance()
+
+	if err != nil {
+		log.Fatal("Failed to initialize the MongoDB client:", err)
+	}
+	// Client = &client
+}
+
+func OpenCollection(client *mongo.Client) *mongo.Collection {
+	collection := client.Database(dbName).Collection("user")
+	return collection
+
+}
+func OpenWatchListCollection(client *mongo.Client, collectionName string) *mongo.Collection {
+	collection := client.Database(dbName).Collection(collectionName)
 	return collection
 
 }
