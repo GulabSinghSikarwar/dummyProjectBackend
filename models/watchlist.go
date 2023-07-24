@@ -12,7 +12,7 @@ type Watchlist struct {
 }
 
 type AddStockRequestBody struct {
-	StockId primitive.ObjectID `json:"stockId" validate:"requried"`
+	StockSymbol string `json:"stockSymbol" validate:"required"`
 	// WatchlistId primitive.ObjectID `json:"watchlistId" validate:"requried"`
 }
 type WatchlistGetReqBody struct {

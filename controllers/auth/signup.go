@@ -3,6 +3,7 @@ package authController
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -17,6 +18,26 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+func getAssociatedWatchList(user *models.User) *models.Watchlist {
+	watchlistCollection := database.OpenWatchListCollection(database.Client, "watchlist")
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+	defer cancel()
+	filter := bson.M{"userId": user.ID}
+	var exsistingWatchlist *models.Watchlist
+
+	err := watchlistCollection.FindOne(ctx, filter).Decode(&exsistingWatchlist)
+	if err != nil {
+		if err != mongo.ErrNoDocuments {
+			return nil
+			// return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "failed", "errors": err.Error(), "message": "something went wrong"})
+		} else {
+
+			log.Fatal(err.Error())
+		}
+	}
+	return exsistingWatchlist
+
+}
 func Logout(c *fiber.Ctx) {
 	expired := time.Now().Add(-time.Hour * 24)
 
@@ -181,9 +202,11 @@ func SignInController(c *fiber.Ctx) error {
 		Domain:   "localhost",
 	})
 
+	watchlist := getAssociatedWatchList(user)
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"status": "success",
-		"user":   user,
-		"token":  tokenString,
+		"status":    "success",
+		"user":      user,
+		"token":     tokenString,
+		"watchlist": watchlist,
 	})
 }
