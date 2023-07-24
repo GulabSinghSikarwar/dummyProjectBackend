@@ -14,7 +14,7 @@ import (
 )
 
 func GetAllWatchlist(c *fiber.Ctx) error {
-	user := c.Locals("user").(models.User)
+	user := c.Locals("user").(*models.User)
 	fmt.Println(user)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
@@ -143,7 +143,7 @@ func GetAllStocks(existingWatchlist *models.Watchlist) []*models.Stock {
 
 // Read
 func GetSingleWatchList(c *fiber.Ctx) error {
-	user := c.Locals("user").(models.User)
+	user := c.Locals("user").(*models.User)
 	userId := user.ID
 	watchlistId := c.Params("watchlistId")
 	WatchListCollection := database.OpenWatchListCollection(database.Client, "watchlist")
@@ -176,7 +176,7 @@ func GetSingleWatchList(c *fiber.Ctx) error {
 
 // NOT TO USE
 func getWatchList(c *fiber.Ctx) error {
-	user := c.Locals("user").(models.User)
+	user := c.Locals("user").(*models.User)
 	userId := user.ID
 	var payload *models.WatchlistGetReqBody
 
@@ -223,7 +223,7 @@ func getWatchList(c *fiber.Ctx) error {
 // Create
 func AddStockToWatchList(c *fiber.Ctx) error {
 
-	user := c.Locals("user").(models.User)
+	user := c.Locals("user").(*models.User)
 	watchlistId := c.Params("watchlistId")
 
 	var payload *models.AddStockRequestBody

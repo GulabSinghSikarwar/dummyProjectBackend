@@ -17,53 +17,53 @@ import (
 )
 
 func AuthenticateUser(c *fiber.Ctx) error {
+	authorization := c.Get("Authorization")
 	var tokenString string
 
-	authorization := c.Get("Authorization")
-
 	if strings.HasPrefix(authorization, "Bearer") {
-		tokenString = strings.Trim(authorization, "Bearer")
-	} else if c.Cookies("jwtToken") != "" {
-		tokenString = c.Cookies("jwtToken")
-
+		tokenString = strings.TrimPrefix(authorization, "Bearer ")
+	} else if jwtToken := c.Cookies("jwtToken"); jwtToken != "" {
+		tokenString = jwtToken
 	}
+
+	// If no token is found, return an error response
 	if tokenString == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "failed", "message": "You are not  loggedIn "})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "failed", "message": "You are not logged in"})
 	}
-	fmt.Println("token:String , : ", tokenString)
-	config, _ := ConfigFiles.LoadConfig(".")
 
-	token, err := jwt.Parse(
-		tokenString,
-		func(jwtToken *jwt.Token) (interface{}, error) {
-
-			if _, ok := jwtToken.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("Unexpected signing method: %v", jwtToken.Header["alg"])
-			}
-			fmt.Println("token: ", jwtToken)
-
-			// if !ok {
-			// 	return nil, fmt.Errorf(" unexpected or unsopported  sigining method %s", jwtToken.Header["alg"])
-
-			// }
-			return []byte(config.JwtSecret), nil
-
-		})
-
-	fmt.Println("token ::: ", token, "  err::::", err.Error())
-
+	// Load your JWT secret from your configuration
+	config, err := ConfigFiles.LoadConfig(".")
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "failed", "message": " invalid token  claim"})
+		fmt.Println("err: ", err.Error())
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"status": "failed", "message": "Internal Server Error"})
 	}
 
+	// Parse the token using the secret
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		// Check the signing method
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(config.JwtSecret), nil
+	})
+
+	// Handle parsing errors
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "failed", "message": "Invalid token claim"})
+	}
+
+	// Check if the token is valid and not expired
 	claims, ok := token.Claims.(jwt.MapClaims)
-
-	fmt.Println("token  --> claims::: ", claims, "  ::: ok ::: ", ok)
-
 	if !ok || !token.Valid {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "failed", "message": " invalid token  claim"})
-
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"status": "failed", "message": "Invalid token claim"})
 	}
+
+	// Check token expiration
+	expirationTime := time.Unix(int64(claims["exp"].(float64)), 0)
+	if time.Now().UTC().After(expirationTime) {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"status": "failed", "message": "Token has expired"})
+	}
+
 	userID := fmt.Sprint(claims["sub"])
 
 	var user models.User
@@ -83,6 +83,7 @@ func AuthenticateUser(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"status": "failed", "message": "something went wrong"})
 
 	}
+	fmt.Println("user : after  token verify ", user)
 
 	c.Locals("user", &user)
 	return c.Next()
