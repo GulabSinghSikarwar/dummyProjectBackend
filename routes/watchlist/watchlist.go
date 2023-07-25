@@ -9,6 +9,7 @@ import (
 func RegisterWatchlistRoute(watchlistGroup fiber.Router) {
 
 	watchlistGroup.Delete("/:watchlistId/:stockId", middleware.AuthenticateUser, watchlistController.DeleteStockFromWatchlist)
+	watchlistGroup.Get("/:watchlistId/:stockId", watchlistController.GetStockById)
 	watchlistGroup.Post("/:watchlistId", middleware.AuthenticateUser, watchlistController.AddStockToWatchList)
 	watchlistGroup.Get("/:watchlistId", middleware.AuthenticateUser, watchlistController.GetSingleWatchList)
 	watchlistGroup.Get("/", middleware.AuthenticateUser, watchlistController.GetAllWatchlist)

@@ -13,6 +13,85 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+func GetStockById(c *fiber.Ctx) error {
+
+	stockId := c.Params("stockId")
+	stockObjectId, err := primitive.ObjectIDFromHex(stockId)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status ": "failed  ", "message  ": err.Error()})
+
+	}
+	stockCollection := database.OpenWatchListCollection(database.Client, "stock")
+
+	var stock *models.Stock
+
+	ctx := context.Background()
+	filter := bson.M{"_id": stockObjectId}
+	err = stockCollection.FindOne(ctx, filter).Decode(&stock)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status ": "failed due to absence of required data ", "message  ": err.Error()})
+		}
+	}
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"status": " success  ", "stock": stock})
+
+}
+
+func GetAllStockInTheWatchList(c *fiber.Ctx) error {
+
+	watchlistId := c.Params("watchlistId")
+	watchlistObjectId, err := primitive.ObjectIDFromHex(watchlistId)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"status": "failed", "message": "error occured while converting watchlist to objectId"})
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+	defer cancel()
+
+	// watchlist collection
+	watchListCollection := database.OpenWatchListCollection(database.Client, "watchlist")
+	// stock collection
+	stockCollection := database.OpenWatchListCollection(database.Client, "stock")
+
+	var exsistingWatchlist *models.Watchlist
+
+	filter := bson.M{"id": watchlistObjectId}
+
+	err = watchListCollection.FindOne(ctx, filter).Decode(&exsistingWatchlist)
+	if err != nil {
+
+		if err == mongo.ErrNoDocuments {
+
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "failed", "message": "no document Found "})
+		} else {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"status": "failed , while finding watchlist ", "message": err.Error()})
+
+		}
+
+	}
+	filter = bson.M{"_id": bson.M{"$in": exsistingWatchlist.Stocks}}
+
+	// Find all documents that match the query.
+	cursor, err := stockCollection.Find(context.Background(), filter)
+	if err != nil {
+		panic(err)
+	}
+
+	// Iterate over the cursor and print the documents.
+	for cursor.Next(context.TODO()) {
+		var result bson.M
+		err := cursor.Decode(&result)
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Println(result)
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"status": "success  "})
+
+}
+
 func GetAllWatchlist(c *fiber.Ctx) error {
 	user := c.Locals("user").(*models.User)
 	fmt.Println(user)
@@ -126,10 +205,13 @@ func GetAllStocks(existingWatchlist *models.Watchlist) []*models.Stock {
 	defer cancel()
 	for _, stockId := range existingWatchlist.Stocks {
 		// fmt.Println("------------------stockId ---------------: ", stockId)
+
+		fmt.Println("stockId :", stockId)
 		filter := bson.M{"_id": stockId}
 		var stock *models.Stock
 
 		err := stockCollection.FindOne(ctx, filter).Decode(&stock)
+		fmt.Println("stock with detail --> :", stock)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				continue
@@ -147,61 +229,21 @@ func GetAllStocks(existingWatchlist *models.Watchlist) []*models.Stock {
 
 // Read
 func GetSingleWatchList(c *fiber.Ctx) error {
-	user := c.Locals("user").(*models.User)
-	userId := user.ID
+	// user := c.Locals("user").(*models.User)
+	// userId := user.ID
 	watchlistId := c.Params("watchlistId")
 	WatchListCollection := database.OpenWatchListCollection(database.Client, "watchlist")
+	watchlistObjectId, err := primitive.ObjectIDFromHex(watchlistId)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"status": "failed", "message": err.Error()})
+	}
 
 	var existingWatchlist *models.Watchlist
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
 
-	filter := bson.M{"userId": userId, "_id": watchlistId}
-
-	err := WatchListCollection.FindOne(ctx, filter).Decode(&existingWatchlist)
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			if err == mongo.ErrNoDocuments {
-				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "failed", "message": "no watchlist exsist with such infomation"})
-			} else {
-				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "failed", "message": err.Error()})
-			}
-
-		}
-
-	}
-	stocks := GetAllStocks(existingWatchlist)
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"status": "success",
-		"result": existingWatchlist,
-		"stocks": stocks,
-	})
-}
-
-// NOT TO USE
-func getWatchList(c *fiber.Ctx) error {
-	user := c.Locals("user").(*models.User)
-	userId := user.ID
-	var payload *models.WatchlistGetReqBody
-
-	err := c.BodyParser(&payload)
-
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "fail", "message": err.Error()})
-	}
-	errors := models.ValidateAddStockRequestBody(payload)
-	if errors != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "fail", "error": errors})
-
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
-	defer cancel()
-
-	WatchListCollection := database.OpenWatchListCollection(database.Client, "watchlist")
-
-	var existingWatchlist *models.Watchlist
-
-	filter := bson.M{"_id": payload.WatchlistId, "userId": userId}
+	filter := bson.M{"_id": watchlistObjectId}
+	fmt.Println("filter : ", filter)
 
 	err = WatchListCollection.FindOne(ctx, filter).Decode(&existingWatchlist)
 	if err != nil {
@@ -215,23 +257,49 @@ func getWatchList(c *fiber.Ctx) error {
 		}
 
 	}
-	stocks := GetAllStocks(existingWatchlist)
+
+	filter = bson.M{"_id": bson.M{"$in": existingWatchlist.Stocks}}
+
+	stockCollection := database.OpenWatchListCollection(database.Client, "stock")
+
+	var result []*models.Stock
+
+	csr, err := stockCollection.Find(context.Background(), filter)
+
+	if err == mongo.ErrNoDocuments {
+		if err == mongo.ErrNoDocuments {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "failed", "message": "no Stocks exsist with such infomation"})
+		} else {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "failed", "message": err.Error()})
+		}
+
+	}
+	err = csr.All(context.Background(), &result)
+	if err != nil {
+
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "failed", "message": err.Error()})
+	}
+
+	fmt.Println("results : ", result)
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"status": "success",
 		"result": existingWatchlist,
-		"stocks": stocks,
+		"stocks": result,
+		// "stocks": stocks,
 	})
-
 }
+
+// NOT TO USE
 
 // Create
 func AddStockToWatchList(c *fiber.Ctx) error {
 
 	user := c.Locals("user").(*models.User)
 	watchlistId := c.Params("watchlistId")
+	fmt.Println("id wid : ", watchlistId)
 	watchlistObjectId, err := primitive.ObjectIDFromHex(watchlistId)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "fail", "message": err.Error()})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "fail :::", "message": err.Error()})
 	}
 
 	var payload *models.AddStockRequestBody
@@ -282,7 +350,7 @@ func AddStockToWatchList(c *fiber.Ctx) error {
 
 	// payload_id, _ := primitive.ObjectIDFromHex(payload.S0)
 
-	existingWatchlist.Stocks = append(existingWatchlist.Stocks, existingWatchlist.ID)
+	existingWatchlist.Stocks = append(existingWatchlist.Stocks, exsistingStock.ID)
 	filter = bson.M{
 		"_id": watchlistObjectId, "userId": user.ID,
 	}

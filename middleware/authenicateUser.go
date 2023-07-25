@@ -22,12 +22,17 @@ func AuthenticateUser(c *fiber.Ctx) error {
 
 	if strings.HasPrefix(authorization, "Bearer") {
 		tokenString = strings.TrimPrefix(authorization, "Bearer ")
+		fmt.Println("through header :", tokenString)
+
 	} else if jwtToken := c.Cookies("jwtToken"); jwtToken != "" {
 		tokenString = jwtToken
+		fmt.Println("through cookie :", jwtToken)
 	}
 
+	fmt.Println("cookies :", c.Cookies("jwtToken"))
 	// If no token is found, return an error response
 	if tokenString == "" {
+
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "failed", "message": "You are not logged in"})
 	}
 

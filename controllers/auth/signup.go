@@ -196,7 +196,7 @@ func SignInController(c *fiber.Ctx) error {
 		Name:     "jwtToken",
 		Value:    tokenString,
 		Path:     "/",
-		MaxAge:   configData.JwtMaxage * 60,
+		MaxAge:   configData.JwtMaxage * 120,
 		Secure:   false,
 		HTTPOnly: true,
 		Domain:   "localhost",
