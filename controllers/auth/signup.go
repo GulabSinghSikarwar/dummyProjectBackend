@@ -18,7 +18,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func GenerateToken(user *models.User) (string, error) {
+func GenerateToken(user *models.User, tokenType string) (string, error) {
 	//  signing method   assinging
 	token := jwt.New(jwt.SigningMethodHS256)
 
@@ -27,7 +27,13 @@ func GenerateToken(user *models.User) (string, error) {
 	//  maping claims
 	claims := token.Claims.(jwt.MapClaims)
 
-	claims["exp"] = time.Now().Add(time.Hour * 24).Unix()
+	if tokenType == "access" {
+
+		claims["exp"] = time.Now().Add(time.Hour * 15).Unix()
+	} else {
+		claims["exp"] = time.Now().Add(time.Hour * 24).Unix()
+
+	}
 	claims["sub"] = user.ID
 	claims["iat"] = now.Unix()
 	claims["nbf"] = now.Unix()
@@ -198,34 +204,18 @@ func SignInController(c *fiber.Ctx) error {
 
 	//  creating  token
 
-	token := jwt.New(jwt.SigningMethodHS256)
-	now := time.Now().UTC()
-
-	claims := token.Claims.(jwt.MapClaims)
-	// claims["exp"] = now.Add(configData.JwtExpiresIn).Unix()
-	claims["exp"] = time.Now().Add(time.Hour * 1).Unix()
-	claims["sub"] = user.ID
-	claims["iat"] = now.Unix()
-	claims["nbf"] = now.Unix()
-
-	tokenString, err := token.SignedString([]byte(configData.JwtSecret))
-	if err != nil {
-		c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"status":  "failed",
-			"message": "something went wrong",
-		})
-	}
+	refreshToken, err := GenerateToken(user, "access")
+	accessToken, err := GenerateToken(user, "refresh")
 
 	c.Cookie(&fiber.Cookie{
 		Name:     "jwtToken",
-		Value:    tokenString,
+		Value:    accessToken,
 		Path:     "/",
 		MaxAge:   configData.JwtMaxage * 120,
 		Secure:   false,
 		HTTPOnly: true,
 		Domain:   "localhost",
 	})
-	refreshToken, err := GenerateToken(user)
 
 	c.Cookie(&fiber.Cookie{
 		Name:     "refreshToken",
@@ -239,10 +229,10 @@ func SignInController(c *fiber.Ctx) error {
 
 	watchlist := getAssociatedWatchList(user)
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"status":            "success",
-		"user":              user,
-		"token":             tokenString,
-		"watchlist":         watchlist,
-		"refrerefreshToken": refreshToken,
+		"status":       "success",
+		"token":        accessToken,
+		"refreshToken": refreshToken,
+		"user":         user,
+		"watchlist":    watchlist,
 	})
 }
