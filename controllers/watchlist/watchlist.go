@@ -134,6 +134,7 @@ func DeleteStockFromWatchlist(c *fiber.Ctx) error {
 
 	stockId := c.Params("stockId")
 	watchlistId := c.Params("watchlistId")
+	// var user models.User
 
 	watchlistCollection := database.OpenWatchListCollection(database.Client, "watchlist")
 
@@ -142,9 +143,15 @@ func DeleteStockFromWatchlist(c *fiber.Ctx) error {
 	defer cancel()
 
 	var existingWatchlist *models.Watchlist
+	watchlistObjectId, err := primitive.ObjectIDFromHex(watchlistId)
 
-	filter := bson.M{"_id": watchlistId}
-	err := watchlistCollection.FindOne(ctx, filter).Decode(&existingWatchlist)
+	if err != nil {
+		return c.Status(fiber.StatusAccepted).JSON(fiber.Map{"status": "failed", "error": err.Error()})
+	}
+
+	filter := bson.M{"_id": watchlistObjectId}
+	err = watchlistCollection.FindOne(ctx, filter).Decode(&existingWatchlist)
+
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "failed", "message": "no watchlist exsist with this credential"})
@@ -154,12 +161,24 @@ func DeleteStockFromWatchlist(c *fiber.Ctx) error {
 
 		}
 	}
+
+	var user models.User
+	if u, ok := c.Locals("user").(models.User); ok {
+		user = u
+		if user.ID != existingWatchlist.UserId {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "failed", "error": "token id and watchlist userId do not match "})
+
+		}
+	}
+
 	objectID, err := primitive.ObjectIDFromHex(stockId)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "failed", "message": err.Error()})
 
 	}
+	fmt.Println(" stocks  before : ", existingWatchlist.Stocks)
 	deleteStockFromWatchlist(existingWatchlist, objectID)
+	fmt.Println(" stocks  after : ", existingWatchlist.Stocks)
 
 	update := bson.M{"$set": bson.M{"stocks": existingWatchlist.Stocks}}
 	err = watchlistCollection.FindOneAndUpdate(ctx, filter, update).Decode(existingWatchlist)
@@ -181,7 +200,12 @@ func DeleteStockFromWatchlist(c *fiber.Ctx) error {
 func deleteStockFromWatchlist(existingWatchlist *models.Watchlist, targetStockId primitive.ObjectID) {
 	index := -1
 
+	fmt.Println("STocks passesd : ", existingWatchlist.Stocks)
+	fmt.Println(" target StockId : ", targetStockId)
+
 	for i, stockId := range existingWatchlist.Stocks {
+		fmt.Println(" single stock Id : ", stockId)
+		fmt.Println(" compare : ", (targetStockId == stockId))
 		if stockId == targetStockId {
 			index = i
 
@@ -190,7 +214,13 @@ func deleteStockFromWatchlist(existingWatchlist *models.Watchlist, targetStockId
 		}
 
 	}
-	if index >= 0 {
+	fmt.Println(" index : ", index)
+	if len(existingWatchlist.Stocks) == 1 {
+		existingWatchlist.Stocks = []primitive.ObjectID{}
+	} else if index == 0 {
+		existingWatchlist.Stocks = existingWatchlist.Stocks[1:]
+
+	} else {
 		existingWatchlist.Stocks = append(existingWatchlist.Stocks[:index], existingWatchlist.Stocks[:index+1]...)
 
 	}
@@ -335,6 +365,11 @@ func AddStockToWatchList(c *fiber.Ctx) error {
 
 	}
 
+	if user.ID != existingWatchlist.UserId {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "failed", "error": "token id and watchlist userId do not match "})
+
+	}
+
 	stockSymbol := payload.StockSymbol
 	fmt.Println(" symbol : ", stockSymbol)
 	var exsistingStock *models.Stock
@@ -346,6 +381,12 @@ func AddStockToWatchList(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "failed ::", "message": err.Error()})
 		}
 
+	}
+	for _, stockid := range existingWatchlist.Stocks {
+		fmt.Println("existingWatchlist.ID ", existingWatchlist.ID, " stockid : ", stockid)
+		if stockid == exsistingStock.ID {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "failed ::", "message": "stock already exsist"})
+		}
 	}
 
 	// payload_id, _ := primitive.ObjectIDFromHex(payload.S0)
