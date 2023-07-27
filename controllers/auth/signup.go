@@ -18,6 +18,30 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+func GenerateToken(user *models.User) (string, error) {
+	//  signing method   assinging
+	token := jwt.New(jwt.SigningMethodHS256)
+
+	now := time.Now().UTC()
+
+	//  maping claims
+	claims := token.Claims.(jwt.MapClaims)
+
+	claims["exp"] = time.Now().Add(time.Hour * 24).Unix()
+	claims["sub"] = user.ID
+	claims["iat"] = now.Unix()
+	claims["nbf"] = now.Unix()
+
+	// generating tokenString
+	configData, _ := ConfigFiles.LoadConfig(("."))
+	tokenString, err := token.SignedString([]byte(configData.JwtSecret))
+
+	if err != nil {
+		return "", err
+	}
+
+	return tokenString, nil
+}
 func getAssociatedWatchList(user *models.User) *models.Watchlist {
 	watchlistCollection := database.OpenWatchListCollection(database.Client, "watchlist")
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
@@ -201,12 +225,24 @@ func SignInController(c *fiber.Ctx) error {
 		HTTPOnly: true,
 		Domain:   "localhost",
 	})
+	refreshToken, err := GenerateToken(user)
+
+	c.Cookie(&fiber.Cookie{
+		Name:     "refreshToken",
+		Value:    refreshToken,
+		Path:     "/",
+		MaxAge:   configData.JwtMaxage * 120,
+		Secure:   false,
+		HTTPOnly: true,
+		Domain:   "localhost",
+	})
 
 	watchlist := getAssociatedWatchList(user)
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"status":    "success",
-		"user":      user,
-		"token":     tokenString,
-		"watchlist": watchlist,
+		"status":            "success",
+		"user":              user,
+		"token":             tokenString,
+		"watchlist":         watchlist,
+		"refrerefreshToken": refreshToken,
 	})
 }
