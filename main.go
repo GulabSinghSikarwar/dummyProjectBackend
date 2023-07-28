@@ -24,6 +24,7 @@ func main() {
 		c.Set("Access-Control-Allow-Headers", "Authorization")
 		c.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		c.Set("Access-Control-Allow-Credentials", "true") // Allow credentials (e.g., cookies)
+		c.Set("Access-Control-Expose-Headers", "Authorization, Refresh-Token")
 
 		// Handle preflight requests
 		if c.Method() == fiber.MethodOptions {
