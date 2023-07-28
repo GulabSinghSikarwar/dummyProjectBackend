@@ -19,6 +19,7 @@ import (
 func AuthenticateUser(c *fiber.Ctx) error {
 	authorization := c.Get("Authorization")
 	var tokenString string
+	// var refreshToken string
 
 	if strings.HasPrefix(authorization, "Bearer") {
 		tokenString = strings.TrimPrefix(authorization, "Bearer ")
@@ -89,6 +90,10 @@ func AuthenticateUser(c *fiber.Ctx) error {
 
 	}
 	fmt.Println("user : after  token verify ", user)
+
+	c.Set("Authorization", "Bearer "+tokenString)
+	c.Set("Refresh-Token", "refresh-token")
+	fmt.Println("tokenString : ..........", tokenString)
 
 	c.Locals("user", &user)
 	return c.Next()
