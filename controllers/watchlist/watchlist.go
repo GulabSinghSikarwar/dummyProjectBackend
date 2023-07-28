@@ -259,8 +259,8 @@ func GetAllStocks(existingWatchlist *models.Watchlist) []*models.Stock {
 
 // Read
 func GetSingleWatchList(c *fiber.Ctx) error {
-	// user := c.Locals("user").(*models.User)
-	// userId := user.ID
+	user := c.Locals("user").(*models.User)
+	userId := user.ID
 	watchlistId := c.Params("watchlistId")
 	WatchListCollection := database.OpenWatchListCollection(database.Client, "watchlist")
 	watchlistObjectId, err := primitive.ObjectIDFromHex(watchlistId)
@@ -272,7 +272,8 @@ func GetSingleWatchList(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
 
-	filter := bson.M{"_id": watchlistObjectId}
+	// filter := bson.M{"_id": watchlistObjectId}
+	filter := bson.M{"_id": watchlistObjectId, "userId": userId}
 	fmt.Println("filter : ", filter)
 
 	err = WatchListCollection.FindOne(ctx, filter).Decode(&existingWatchlist)

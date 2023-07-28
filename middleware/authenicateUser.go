@@ -95,6 +95,8 @@ func AuthenticateUser(c *fiber.Ctx) error {
 	c.Set("Refresh-Token", "refresh-token")
 	fmt.Println("tokenString : ..........", tokenString)
 
+	fmt.Println("userId : ", user.ID)
+
 	c.Locals("user", &user)
 	return c.Next()
 }
